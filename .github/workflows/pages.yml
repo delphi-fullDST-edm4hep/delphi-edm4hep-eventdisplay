@@ -1,0 +1,51 @@
+name: Pages
+
+# The official location of this site. docs/index.html is the landing page, docs/app.html
+# the display (it reads any edm4hep file in the browser with uproot under Pyodide,
+# installing docs/wheels/*.whl), and the manual is built from doc/ into docs/manual/
+# here, so it is never committed.
+on:
+  push:
+    branches: [main]
+    paths: ["docs/**", "doc/**", "mkdocs.yml", "src/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build the manual
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[docs]'
+          mkdocs build   # not --strict: the manual deliberately links out to ../app.html
+
+      # enablement: turns Pages on the first time this runs, so no one has to click
+      # through Settings. It needs Pages to be available for the repository at all:
+      # a private repo on a free plan cannot have Pages, so either make the repo
+      # public (as delphi-edm4hep is) or move the org to a paid plan.
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deploy
+        uses: actions/deploy-pages@v4

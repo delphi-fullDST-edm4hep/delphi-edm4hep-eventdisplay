@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "delphi-eventdisplay"
+version = "0.1.0"
+description = "DELPHI event display from edm4hep, drawn with Plotly: interactive, self-contained HTML, no DELGRA/X11/ROOT"
+readme = "README.md"
+license = { text = "BSD-3-Clause" }
+requires-python = ">=3.9"
+authors = [{ name = "Sitian Qian" }]
+keywords = ["hep", "delphi", "edm4hep", "plotly", "event display", "lep"]
+# Branches are read with library="np" (see read._Entry): our own code never touches
+# awkward, though uproot >= 5.7 imports it itself, so it stays in the dependency list.
+dependencies = ["uproot>=5", "awkward>=2", "numpy>=1.22", "plotly>=5.20"]
+
+[project.optional-dependencies]
+style = ["plotlyhep>=0.2"]
+docs = ["mkdocs-material>=9.5", "mkdocstrings[python]>=0.25"]
+dev = ["delphi-eventdisplay[style]", "delphi-eventdisplay[docs]", "ruff", "pytest>=7"]
+
+[project.scripts]
+delphi-display = "delphi_eventdisplay.cli:main"
+delphi-pages = "delphi_eventdisplay.pages:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["delphi_eventdisplay"]
+
+[tool.ruff]
+line-length = 140
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "NPY", "RUF"]
+ignore = ["E501", "E701", "E702", "E731", "E741", "RUF001", "RUF002", "RUF003", "RUF005"]

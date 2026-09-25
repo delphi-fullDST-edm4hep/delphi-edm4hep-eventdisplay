@@ -1,0 +1,20 @@
+{
+ "events": [
+  {
+   "key": "data_48758_2666",
+   "file": "events/data_48758_2666.json",
+   "title": "run 48758, event 2666 \u2014 Z \u2192 bb\u0304 with a displaced \u03c6 \u2192 K\u207aK\u207b",
+   "run": 48758,
+   "event": 2666,
+   "source": "Y13709.126.edm4hep.root",
+   "entry": 3990,
+   "n_charged": 19,
+   "n_neutral": 15,
+   "btag": 8.286072731018066,
+   "note": "SVs at 9.66 mm (\u03c6 side) and 2.87 mm",
+   "bytes": 495641,
+   "schema": "events/data_48758_2666.schema.json",
+   "figure3d": "events/data_48758_2666.3d.json"
+  }
+ ]
+}

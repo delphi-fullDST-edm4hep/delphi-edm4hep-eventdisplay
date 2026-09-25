@@ -1,0 +1,82 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>DELPHI event display</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="logo.png">
+<style>
+ :root { --ink:#191c20; --soft:#5c636e; --navy:#1a4480; --line:rgba(25,28,32,.14); --green:#4c9a6a; }
+ * { box-sizing:border-box; }
+ body { margin:0; font:16px/1.65 -apple-system,"Segoe UI",Helvetica,Arial,sans-serif; color:var(--ink); background:#fcfcfb; }
+ .wrap { max-width:820px; margin:0 auto; padding:56px 22px 80px; }
+ header { display:flex; align-items:center; gap:18px; margin-bottom:6px; }
+ header img { width:76px; height:76px; object-fit:contain; flex:none; }
+ h1 { font:700 34px/1.15 "TeX Gyre Heros",Helvetica,Arial,sans-serif; margin:0; } h1 span { color:var(--navy); }
+ .tag { color:var(--soft); margin:0 0 30px 94px; font-size:16.5px; }
+ @media (max-width:560px){ .tag { margin-left:0; } header { flex-wrap:wrap; } }
+ .go { display:flex; gap:14px; flex-wrap:wrap; margin:0 0 38px; }
+ .go a { display:block; flex:1 1 260px; padding:16px 20px; border-radius:9px; text-decoration:none;
+         border:1px solid var(--line); background:#fff; transition:.14s; }
+ .go a:hover { border-color:var(--navy); box-shadow:0 3px 14px rgba(26,68,128,.13); transform:translateY(-1px); }
+ .go a.primary { background:var(--navy); border-color:var(--navy); }
+ .go .t { font-weight:650; font-size:17px; color:var(--navy); display:block; }
+ .go a.primary .t { color:#fff; }
+ .go .d { color:var(--soft); font-size:13.5px; display:block; margin-top:3px; }
+ .go a.primary .d { color:#d5e0f2; }
+ h2 { font:600 12px "IBM Plex Mono",Menlo,monospace; letter-spacing:.11em; text-transform:uppercase;
+      color:var(--navy); margin:34px 0 10px; }
+ p { margin:0 0 14px; } a { color:var(--navy); }
+ ul { margin:0 0 14px; padding-left:20px; } li { margin:4px 0; }
+ code { font-family:"IBM Plex Mono",Menlo,monospace; font-size:13.5px; background:#f1f2f4; padding:1px 5px; border-radius:3px; }
+ pre { background:#f3f4f6; border:1px solid var(--line); border-radius:7px; padding:13px 15px; overflow-x:auto; }
+ pre code { background:none; padding:0; font-size:13px; }
+ .note { border-left:3px solid var(--green); padding:2px 0 2px 14px; color:var(--soft); font-size:14.5px; margin:20px 0; }
+ footer { margin-top:42px; padding-top:18px; border-top:1px solid var(--line); color:var(--soft); font-size:14px; }
+</style></head><body><div class="wrap">
+
+<header><img src="logo.png" alt="DELPHI + EDM4hep"><h1>DELPHI <span>event display</span></h1></header>
+<p class="tag">DELPHI events straight from edm4hep — no DELGRA, no X11, no ROOT. Drawn with Plotly, and it runs in your browser.</p>
+
+<div class="go">
+  <a class="primary" href="app.html"><span class="t">Open the event display →</span>
+    <span class="d">A showcase event loads immediately; drop your own <code>.edm4hep.root</code> file to explore any event.</span></a>
+  <a href="manual/"><span class="t">Documentation →</span>
+    <span class="d">Install, command line, collections and roles, what is drawn, the decoding rules, Python API.</span></a>
+</div>
+
+<h2>What it does</h2>
+<p><b>Opens any DELPHI edm4hep file, in the browser.</b> Drop a file on the display and
+<a href="https://github.com/scikit-hep/uproot5">uproot</a> reads it locally under Pyodide — nothing is uploaded,
+and there is no server behind this page.</p>
+<p><b>Nothing is pinned by collection name.</b> A DELPHI file holds 3 <code>Track</code> collections, 7
+<code>Vertex</code>, 4 <code>Cluster</code>, 2 <code>TrackerHit3D</code> and 24 <code>ParticleID</code>. The display
+discovers them from podio's own metadata and binds each part of the picture to one by <i>role</i>, which you can
+change. Beside the figure, every collection is listed with its type, domain, provenance, links and per-event count;
+select one and everything not from it dims, or click a track to select its collection.</p>
+<p><b>Only measured quantities are drawn.</b> Tracks are helices from their own perigee parameters, started at the
+vertex they belong to, with the back-extrapolation to the IP dotted so the picture never claims a path the particle
+did not travel.</p>
+
+<div class="note">In the 3-D scene this matters more, not less: a vertex-detector hit is a <i>strip</i>, so it
+constrains a line in space, not a point. Hits on a track are placed at the z their own track measures; hits on no
+track are drawn as the line they actually constrain.</div>
+
+<h2>Four panels, or the detector</h2>
+<ul>
+ <li><b>(a) r-φ</b> whole event — helices, EM showers as towers, the HPC radius taken from the shower positions</li>
+ <li><b>(b) r-z</b> — the same tracks, r signed by thrust hemisphere</li>
+ <li><b>(c) vertex detector</b> — VD layers, R-φ hits, primary and secondary vertices; zoom replaces the fixed inset</li>
+ <li><b>(d) RICH</b> — Cherenkov angle against momentum, liquid and gas radiators, with π/K/p curves and veto markers</li>
+ <li><b>3-D</b> — the barrels, the helices in space, showers and vertices, physically proportional</li>
+</ul>
+
+<h2>From the command line</h2>
+<pre><code>pip install -e .
+delphi-display FILE.edm4hep.root --entry 3990 --out event.html --view both</code></pre>
+<p>See the <a href="manual/cli/">command-line reference</a>.</p>
+
+<footer>
+ Ported from <code>event_display.py</code> by J. Zhang. Files produced by
+ <a href="https://github.com/delphi-fullDST-edm4hep/delphi-edm4hep">delphi-edm4hep</a>; collection vocabulary matches its
+ <a href="https://delphi-fulldst-edm4hep.github.io/delphi-edm4hep/collection_map.html">collection map</a>.
+ Styling via <a href="https://github.com/DickyChant/plotlyhep">plotlyhep</a>.
+ <br><a href="https://github.com/delphi-fullDST-edm4hep/delphi-edm4hep-eventdisplay">Source on GitHub</a>
+</footer>
+</div></body></html>

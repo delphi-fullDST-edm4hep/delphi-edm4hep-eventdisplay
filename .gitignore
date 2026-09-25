@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+build/
+dist/
+# event data is large and lives on EOS, not here
+*.root
+data/
+# The figure JSON is the published artefact and IS committed (a few hundred kB).
+# The standalone HTML is not: it inlines plotly.js and runs to several MB.
+docs/events/*.html
+# the manual is built from doc/ by mkdocs
+docs/manual/
+site/
+# generated figures, but not the repository's own assets
+*.png
+*.pdf
+!docs/logo.png

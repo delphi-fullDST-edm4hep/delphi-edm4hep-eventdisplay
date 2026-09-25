@@ -1,0 +1,185 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>DELPHI event display — editor</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="logo.png">
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+<style>
+ :root { --ink:#191c20; --soft:#5c636e; --navy:#1a4480; --line:rgba(25,28,32,.14); }
+ body { margin:0; font:15px/1.5 -apple-system,"Segoe UI",Helvetica,Arial,sans-serif; color:var(--ink); background:#fcfcfb; }
+ header { padding:14px 22px; border-bottom:1px solid var(--line); display:flex; gap:16px; align-items:baseline; flex-wrap:wrap; }
+ header h1 { font:700 20px "TeX Gyre Heros",Helvetica,Arial,sans-serif; margin:0; } header h1 span { color:var(--navy); }
+ header a { color:var(--navy); } .hint { color:var(--soft); font-size:13px; }
+ main { display:grid; grid-template-columns: 1fr 340px; min-height: calc(100vh - 56px); }
+ #stage { padding:18px; overflow:auto; background:#f3f4f6; display:flex; align-items:flex-start; justify-content:center; }
+ #canvas { background:#fff; box-shadow:0 2px 14px rgba(0,0,0,.12); }
+ aside { border-left:1px solid var(--line); background:#fff; padding:14px 16px 40px; overflow:auto; font-size:13px; }
+ aside h2 { font:600 11px "IBM Plex Mono",Menlo,monospace; letter-spacing:.1em; text-transform:uppercase; color:var(--navy); margin:16px 0 6px; }
+ aside h2:first-child { margin-top:0; }
+ .row { display:flex; gap:6px; align-items:center; margin:4px 0; flex-wrap:wrap; } .row label { min-width:70px; color:var(--soft); }
+ input[type=text], input[type=number], select, textarea { font:12px "IBM Plex Mono",Menlo,monospace; padding:4px 6px; border:1px solid rgba(0,0,0,.25); border-radius:4px; background:#fff; }
+ input[type=text] { flex:1; min-width:0; } input[type=number] { width:62px; } select { flex:1; }
+ button { font:12px "IBM Plex Mono",Menlo,monospace; padding:4px 9px; border:1px solid rgba(0,0,0,.25); border-radius:4px; background:#f9fafb; cursor:pointer; }
+ button:hover { background:#eef2ff; border-color:var(--navy); } button.primary { background:var(--navy); color:#fff; border-color:var(--navy); }
+ textarea { width:100%; box-sizing:border-box; height:110px; resize:vertical; }
+ .ann { display:flex; gap:6px; align-items:center; margin:3px 0; } .ann input { flex:1; }
+ .drop { border:1px dashed rgba(0,0,0,.3); border-radius:6px; padding:8px; color:var(--soft); text-align:center; }
+ .drop.over { border-color:var(--navy); color:var(--navy); }
+ .small { color:var(--soft); font-size:12px; }
+ .cls { display:flex; align-items:center; gap:6px; margin:2px 0; } .sw { width:12px; height:12px; border-radius:2px; flex:none; }
+ header h1 { display:flex; align-items:center; gap:9px; } header h1 img { height:28px; width:28px; object-fit:contain; }
+</style></head><body>
+<header><h1><img src="logo.png" alt="DELPHI + EDM4hep">DELPHI event display <span>— editor</span></h1>
+ <span class="hint">drag the title, legend and annotations · zoom by dragging · every change is captured on the right as Python</span>
+ <a href="app.html">← event display</a></header>
+<main>
+ <div id="stage"><div id="canvas"></div></div>
+ <aside>
+  <h2>event</h2>
+  <div class="row"><label>published</label><select id="evsel"></select></div>
+  <div class="drop" id="drop">or drop a figure JSON here —
+    <input type="file" id="file" accept="application/json" style="display:none"><a href="#" id="pick">choose a file</a></div>
+  <div class="row"><label>canvas</label><input type="number" id="w" min="300" step="10"> × <input type="number" id="h" min="300" step="10"> px <button id="fit">fit</button></div>
+  <h2>what is drawn</h2>
+  <div id="classes"></div>
+  <h2>titles</h2>
+  <div class="row"><label>title</label><input type="text" id="title"></div>
+  <div class="row"><label>legend</label><button id="legend">show / hide</button><button id="transp">transparent</button></div>
+  <div class="row"><label>fonts ×</label><input type="range" id="fontscale" min="0.6" max="1.8" step="0.05" value="1" style="flex:1"><span id="fontval">1.00</span></div>
+  <h2>annotations</h2>
+  <div class="row"><button id="addtext">+ text</button><button id="addarrow">+ arrow</button><span class="small">then drag into place</span></div>
+  <div id="annlist"></div>
+  <h2>edits (paste into Python)</h2>
+  <textarea id="edits" readonly placeholder="fig.update_layout(...) appears here as you drag and edit"></textarea>
+  <div class="row"><button id="copyedits">copy</button><button id="reset">reset edits</button></div>
+  <h2>export</h2>
+  <div class="row"><button id="png" class="primary">PNG ×2</button><button id="svg">SVG</button><button id="json">figure JSON</button></div>
+  <p class="small">Edits persist in this browser, per event. Nothing leaves your machine.</p>
+ </aside>
+</main>
+<script>
+(async function () {
+  const gd = document.getElementById('canvas'), $ = id => document.getElementById(id);
+  const deep = o => JSON.parse(JSON.stringify(o));
+  const config = { editable:true, displaylogo:false, responsive:false, scrollZoom:true,
+    edits:{ annotationPosition:true, annotationTail:true, annotationText:true, legendPosition:true, titleText:true, shapePosition:true },
+    modeBarButtonsToRemove:['select2d','lasso2d'] };
+  let manifest = { events: [] };
+  try { manifest = await fetch('events/index.json').then(r => r.json()); } catch (e) {}
+  for (const ev of manifest.events) { const o = document.createElement('option'); o.value = ev.key; o.textContent = ev.title; $('evsel').appendChild(o); }
+
+  let fig = null, key = null, edits = {}, baseLayout = null;
+  const storeKey = () => 'delphi-eventdisplay-editor:' + key;
+  const setPath = (obj, path, val) => {
+    const parts = path.replace(/\[(\d+)\]/g, '.$1').split('.'); let o = obj;
+    for (let i = 0; i < parts.length - 1; i++) { const p = parts[i], nxt = parts[i+1];
+      if (!(p in o)) o[p] = /^\d+$/.test(nxt) ? [] : {}; o = o[p]; }
+    o[parts[parts.length - 1]] = val;
+  };
+  const merged = e => { const out = {}; for (const [k,v] of Object.entries(e)) setPath(out, k, v); return out; };
+
+  function showEdits() {
+    const lines = Object.entries(edits).map(([k,v]) => `    ${JSON.stringify(k)}: ${JSON.stringify(v)},`);
+    $('edits').value = lines.length ? `fig.update_layout({\n${lines.join('\n')}\n})` : '';
+  }
+  function remember(e) {
+    for (const [k,v] of Object.entries(e)) { if (k !== 'autosize') edits[k] = v; }
+    try { localStorage.setItem(storeKey(), JSON.stringify(edits)); } catch (err) {}
+    showEdits();
+  }
+  // one checkbox per legend group: the physics classes the figure draws
+  function refreshClasses() {
+    const box = $('classes'); box.innerHTML = '';
+    const groups = new Map();
+    (gd.data || []).forEach((t, i) => {
+      const g = t.legendgroup || t.name || ('trace ' + i);
+      if (!groups.has(g)) groups.set(g, { idx: [], name: t.name || g, colour: (t.line && t.line.color) || (t.marker && t.marker.color) || '#888' });
+      groups.get(g).idx.push(i);
+    });
+    for (const [g, info] of groups) {
+      if (typeof info.colour !== 'string') info.colour = '#888';
+      const row = document.createElement('div'); row.className = 'cls';
+      const cb = document.createElement('input'); cb.type = 'checkbox';
+      cb.checked = gd.data[info.idx[0]].visible !== 'legendonly' && gd.data[info.idx[0]].visible !== false;
+      cb.addEventListener('change', () => Plotly.restyle(gd, { visible: cb.checked ? true : 'legendonly' }, info.idx));
+      const sw = document.createElement('span'); sw.className = 'sw'; sw.style.background = info.colour;
+      const lab = document.createElement('span'); lab.textContent = info.name;
+      row.append(cb, sw, lab); box.appendChild(row);
+    }
+  }
+  function refreshPanel() {
+    const t = gd.layout.title;
+    $('title').value = (t && (typeof t === 'string' ? t : t.text)) || '';
+    const list = $('annlist'); list.innerHTML = '';
+    (gd.layout.annotations || []).forEach((a, i) => {
+      const row = document.createElement('div'); row.className = 'ann';
+      const inp = document.createElement('input'); inp.type = 'text'; inp.value = a.text || '';
+      inp.addEventListener('change', () => Plotly.relayout(gd, { [`annotations[${i}].text`]: inp.value }));
+      const del = document.createElement('button'); del.textContent = '×'; del.title = 'delete';
+      del.addEventListener('click', () => { const anns = deep(gd.layout.annotations); anns.splice(i,1); Plotly.relayout(gd, { annotations: anns }); });
+      row.append(inp, del); list.appendChild(row);
+    });
+    refreshClasses(); showEdits();
+  }
+  async function draw() {
+    const layout = Object.assign(deep(fig.layout), merged(edits));
+    $('w').value = layout.width || 1500; $('h').value = layout.height || 1450;
+    await Plotly.react(gd, fig.data, layout, config);
+    refreshPanel();
+  }
+  async function load(k, obj) {
+    key = k; fig = obj; baseLayout = deep(fig.layout);
+    try { edits = JSON.parse(localStorage.getItem(storeKey()) || '{}'); } catch (e) { edits = {}; }
+    await draw();
+    gd.removeAllListeners && gd.removeAllListeners('plotly_relayout');
+    gd.on('plotly_relayout', e => { if (Object.keys(e).some(k => k !== 'autosize')) remember(e); refreshPanel(); });
+    gd.on('plotly_restyle', refreshClasses);
+  }
+  async function loadPublished(k) {
+    const ev = manifest.events.find(x => x.key === k) || manifest.events[0];
+    if (!ev) return;
+    $('evsel').value = ev.key;
+    await load(ev.key, await fetch(ev.file).then(r => r.json()));
+  }
+  $('evsel').addEventListener('change', e => loadPublished(e.target.value));
+  $('pick').addEventListener('click', e => { e.preventDefault(); $('file').click(); });
+  $('file').addEventListener('change', e => { const f = e.target.files[0]; if (f) f.text().then(t => load('file:'+f.name, JSON.parse(t))); });
+  const drop = $('drop');
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+  drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over');
+    const f = e.dataTransfer.files[0]; if (f) f.text().then(t => load('file:'+f.name, JSON.parse(t))); });
+
+  const resize = () => Plotly.relayout(gd, { width:+$('w').value, height:+$('h').value });
+  $('w').addEventListener('change', resize); $('h').addEventListener('change', resize);
+  $('fit').addEventListener('click', () => { const s = $('stage');
+    $('w').value = Math.max(400, s.clientWidth - 36); $('h').value = Math.round((s.clientWidth - 36) * 0.97); resize(); });
+  $('title').addEventListener('change', e => Plotly.relayout(gd, { 'title.text': e.target.value }));
+  $('legend').addEventListener('click', () => Plotly.relayout(gd, { showlegend: !gd._fullLayout.showlegend }));
+  $('transp').addEventListener('click', () => { const t = gd._fullLayout.paper_bgcolor === 'rgba(0,0,0,0)';
+    Plotly.relayout(gd, { paper_bgcolor: t?'white':'rgba(0,0,0,0)', plot_bgcolor: t?'white':'rgba(0,0,0,0)' }); });
+  $('fontscale').addEventListener('input', e => {
+    const s = +e.target.value; $('fontval').textContent = s.toFixed(2); const u = {};
+    u['font.size'] = ((baseLayout.font && baseLayout.font.size) || 12) * s;
+    (baseLayout.annotations || []).forEach((a,i) => { if (a.font && a.font.size) u[`annotations[${i}].font.size`] = a.font.size * s; });
+    if (baseLayout.legend && baseLayout.legend.font && baseLayout.legend.font.size) u['legend.font.size'] = baseLayout.legend.font.size * s;
+    Plotly.relayout(gd, u);
+  });
+  const addAnn = arrow => () => { const anns = deep(gd.layout.annotations || []);
+    anns.push({ text: arrow ? 'point here' : 'new text', x:0.5, y:0.5, xref:'paper', yref:'paper',
+                showarrow:arrow, ax: arrow?60:0, ay: arrow?-50:0, arrowhead:2, font:{ size:14 } });
+    Plotly.relayout(gd, { annotations: anns }); };
+  $('addtext').addEventListener('click', addAnn(false)); $('addarrow').addEventListener('click', addAnn(true));
+  $('copyedits').addEventListener('click', () => navigator.clipboard.writeText($('edits').value));
+  $('reset').addEventListener('click', () => { edits = {}; try { localStorage.removeItem(storeKey()); } catch(e) {} draw(); });
+  const name = () => (key || 'event').replace(/^file:/,'').replace(/\.json$/,'');
+  $('png').addEventListener('click', () => Plotly.downloadImage(gd, { format:'png', scale:2, filename:name() }));
+  $('svg').addEventListener('click', () => Plotly.downloadImage(gd, { format:'svg', filename:name() }));
+  $('json').addEventListener('click', () => { const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify({ data:gd.data, layout:gd.layout }, null, 1)], { type:'application/json' }));
+    a.download = name()+'.json'; document.body.appendChild(a); a.click(); a.remove(); });
+
+  const start = new URLSearchParams(location.search).get('ev');
+  if (manifest.events.length) await loadPublished(start);
+  else await load('empty', { data: [], layout: { width:900, height:600, annotations:[{ text:'No events published yet — drop a figure JSON here.', xref:'paper', yref:'paper', x:0.5, y:0.5, showarrow:false }] } });
+})();
+</script>
+</body></html>

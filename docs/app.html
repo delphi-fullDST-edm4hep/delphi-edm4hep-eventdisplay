@@ -1,0 +1,438 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>DELPHI event display — open any event</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="logo.png">
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.28.0/full/pyodide.js"></script>
+<style>
+ :root { --ink:#191c20; --soft:#5c636e; --navy:#1a4480; --line:rgba(25,28,32,.14); --warn:#b3261e; --ok:#1e7b34; }
+ * { box-sizing:border-box; }
+ body { margin:0; font:14.5px/1.55 -apple-system,"Segoe UI",Helvetica,Arial,sans-serif; color:var(--ink); background:#fcfcfb; }
+ header { padding:12px 20px; border-bottom:1px solid var(--line); display:flex; gap:14px; align-items:center; flex-wrap:wrap; background:#fff; }
+ header h1 { font:700 18px "TeX Gyre Heros",Helvetica,Arial,sans-serif; margin:0; white-space:nowrap; } header h1 span { color:var(--navy); }
+ #logo { height:34px; width:34px; object-fit:contain; }
+ #views { display:inline-flex; } #views .view { border-radius:0; margin:0; }
+ #views .view:first-child { border-radius:4px 0 0 4px; } #views .view:last-child { border-radius:0 4px 4px 0; border-left:none; }
+ #views .view.on { background:var(--navy); color:#fff; border-color:var(--navy); }
+ #saves { display:inline-flex; } #saves button { border-radius:0; }
+ #saves button:first-child { border-radius:4px 0 0 4px; }
+ #saves button:last-child { border-radius:0 4px 4px 0; }
+ #saves button + button { border-left:none; }
+ header a { color:var(--navy); }
+ .mono { font-family:"IBM Plex Mono",Menlo,monospace; font-size:12.5px; }
+ button, select, input[type=number], input[type=text] { font:12.5px "IBM Plex Mono",Menlo,monospace; padding:4px 8px;
+   border:1px solid rgba(0,0,0,.25); border-radius:4px; background:#fff; }
+ button { background:#f9fafb; cursor:pointer; } button:hover:not(:disabled) { background:#eef2ff; border-color:var(--navy); }
+ button:disabled { opacity:.5; cursor:default; } button.primary { background:var(--navy); color:#fff; border-color:var(--navy); }
+ #drop { border:1px dashed rgba(0,0,0,.32); border-radius:6px; padding:5px 12px; color:var(--soft); font-size:12.5px; }
+ #drop.over { border-color:var(--navy); color:var(--navy); background:#eef2ff; }
+ #status { color:var(--soft); font-size:12.5px; flex:1; min-width:180px; }
+ #status.err { color:var(--warn); } #status.ok { color:var(--ok); }
+ main { display:grid; grid-template-columns:360px 1fr; min-height:calc(100vh - 54px); }
+ aside { border-right:1px solid var(--line); background:#fff; overflow:auto; padding:12px 14px 40px; }
+ aside h2 { font:600 11px "IBM Plex Mono",Menlo,monospace; letter-spacing:.1em; text-transform:uppercase; color:var(--navy); margin:14px 0 6px; }
+ aside h2:first-child { margin-top:0; }
+ .role { display:grid; grid-template-columns:96px 1fr; gap:6px; align-items:center; margin:3px 0; }
+ .role label { color:var(--soft); font-size:12px; } .role select { width:100%; min-width:0; }
+ .kind { margin:8px 0 2px; font-weight:600; font-size:12px; color:var(--soft); }
+ .coll { display:grid; grid-template-columns:44px 1fr; gap:8px; padding:4px 6px; border-radius:4px; cursor:pointer; align-items:baseline; }
+ .coll:hover { background:#eef2ff; } .coll.sel { background:#e3ecff; outline:1px solid var(--navy); }
+ .coll.empty { opacity:.42; } .coll .n { text-align:right; font-family:"IBM Plex Mono",Menlo,monospace; font-size:12px; color:var(--navy); }
+ .coll .nm { font-family:"IBM Plex Mono",Menlo,monospace; font-size:11.5px; word-break:break-all; }
+ .coll .meta { grid-column:2; color:var(--soft); font-size:11px; }
+ .badge { display:inline-block; padding:0 5px; border-radius:3px; background:#eef0f3; margin-right:4px; font-size:10.5px; }
+ .badge.used { background:var(--navy); color:#fff; }
+ #detail { border-top:1px solid var(--line); margin-top:12px; padding-top:10px; font-size:12.5px; }
+ #detail dt { color:var(--soft); font-size:11px; text-transform:uppercase; letter-spacing:.06em; margin-top:6px; }
+ #detail dd { margin:1px 0 0; font-family:"IBM Plex Mono",Menlo,monospace; font-size:11.5px; word-break:break-all; }
+ #stage { padding:14px; overflow:auto; background:#f3f4f6; display:flex; align-items:flex-start; justify-content:center; }
+ #canvas { background:#fff; box-shadow:0 2px 14px rgba(0,0,0,.12); }
+ #splash { margin:auto; max-width:540px; color:var(--soft); text-align:center; padding:40px 20px; }
+ #splash h3 { color:var(--ink); font:600 17px -apple-system,Helvetica,Arial,sans-serif; }
+ #bar { height:3px; background:var(--navy); width:0; transition:width .3s; }
+ #info { padding:7px 20px; background:#fff; border-bottom:1px solid var(--line); font-size:13px;
+         display:flex; gap:0 20px; flex-wrap:wrap; align-items:baseline; }
+ #info:empty { display:none; }
+ #info .t { font-weight:600; } #info .k { color:var(--soft); }
+ #info .v { font-family:"IBM Plex Mono",Menlo,monospace; }
+ #info .note { color:var(--soft); font-style:italic; }
+</style></head><body>
+<header>
+ <img src="logo.png" alt="DELPHI + EDM4hep" id="logo">
+ <h1>DELPHI <span>event display</span></h1>
+ <span id="views" class="mono">
+   <button id="v2d" class="view on">panels</button><button id="v3d" class="view">3D</button>
+ </span>
+ <select id="showcase" title="published events"></select>
+ <span id="drop">or drop an <b>.edm4hep.root</b> file to open any event
+   <input type="file" id="file" accept=".root" style="display:none"> (<a href="#" id="pick">choose</a>)</span>
+ <span class="mono">entry <input type="number" id="entry" value="0" min="0" style="width:88px" disabled></span>
+ <button id="prev" disabled>◀</button><button id="next" disabled>▶</button>
+ <button id="render" class="primary" disabled>render</button>
+ <span id="saves" class="mono">
+   <button id="savePng" title="save this view as a PNG">PNG</button
+   ><button id="saveSvg" title="save this view as an SVG">SVG</button
+   ><button id="saveJson" title="save the Plotly figure JSON">JSON</button>
+ </span>
+ <span id="status">loading the showcase event…</span>
+ <a href="./" title="back to the landing page">← home</a>
+ <a href="manual/" title="documentation">docs</a>
+ <a href="editor.html" title="drag labels, export the update_layout calls">editor →</a>
+</header>
+<div id="bar"></div>
+<div id="info"></div>
+<main>
+ <aside>
+  <h2>drawn from</h2>
+  <div id="roles"><p class="mono" style="color:#5c636e">load an event to choose collections</p></div>
+  <h2>collections in this event</h2>
+  <input type="text" id="find" placeholder="search name, type, domain" style="width:100%; margin-bottom:6px">
+  <label class="mono" style="color:#5c636e"><input type="checkbox" id="onlyfilled" checked> only populated</label>
+  <div id="colls"></div>
+  <div id="detail"></div>
+ </aside>
+ <div id="stage">
+   <div id="splash">
+     <h3>DELPHI event display</h3>
+     <p>The file is read <b>in your browser</b> — uproot runs under Pyodide and never uploads anything.
+        The first event takes a while: Python, numpy, uproot and awkward have to load once (~30 MB, then cached).</p>
+     <p class="mono" style="font-size:12px">drop a .edm4hep.root file above to start</p>
+   </div>
+   <div id="canvas" style="display:none"></div>
+ </div>
+</main>
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const gd = $('canvas');
+  let py = null, booting = null, loadedName = null;
+  let schema = null, figure = null, selected = null, domains = {}, manifest = { events: [] };
+  let mode = 'showcase';            // 'showcase' = published JSON, 'live' = a file read in the browser
+  let view = '2d';                  // '2d' = four panels, '3d' = detector scene
+  let figs = { '2d': null, '3d': null };   // both views of the event currently shown
+
+  const setStatus = (msg, cls='') => { $('status').textContent = msg; $('status').className = cls; };
+  const bar = pct => { $('bar').style.width = pct + '%'; };
+
+  // Domains are the one field podio does not carry; the converter's map supplies them.
+  async function loadDomains() {
+    try { domains = (await fetch('collection_domains.json').then(r => r.json())).domains || {}; }
+    catch (e) { domains = {}; }
+  }
+
+  // ---------------------------------------------------------------- showcase
+  async function loadShowcase(key) {
+    try {
+      const ev = manifest.events.find(e => e.key === key) || manifest.events[0];
+      if (!ev) { setStatus('no published events; drop a file to begin'); return; }
+      $('showcase').value = ev.key;
+      setStatus(`loading ${ev.title}…`); bar(40);
+      const [fig, sch, f3] = await Promise.all([
+        fetch(ev.file).then(r => r.json()),
+        ev.schema ? fetch(ev.schema).then(r => r.json()).catch(() => null) : Promise.resolve(null),
+        ev.figure3d ? fetch(ev.figure3d).then(r => r.json()).catch(() => null) : Promise.resolve(null),
+      ]);
+      mode = 'showcase'; loadedName = null;
+      setMode();
+      await show({ '2d': fig, '3d': f3 }, sch);
+      bar(100); setTimeout(() => bar(0), 500);
+      const n = sch ? Object.values(sch.collections).filter(c => c.count).length : 0;
+      setStatus(`${ev.source} entry ${ev.entry} — ${n} collections populated · drop a file to open any event`, 'ok');
+    } catch (err) { setStatus('could not load the showcase: ' + err.message, 'err'); bar(0); }
+  }
+
+  // shared renderer for both modes; takes both views and draws the selected one
+  async function show(pair, sch) {
+    figs = pair;
+    $('v3d').disabled = !figs['3d'];
+    $('v3d').title = figs['3d'] ? '' : 'no 3-D figure published for this event';
+    if (view === '3d' && !figs['3d']) view = '2d';
+    setViewButtons();
+    figure = figs[view] || figs['2d'];
+    schema = sch;
+    drawInfo((figure && figure.layout && figure.layout.meta) || {});
+    if (schema) for (const [n, c] of Object.entries(schema.collections))
+      if (!c.domain || c.domain === 'unknown') c.domain = domains[n] || 'unknown';
+    $('splash').style.display = 'none'; gd.style.display = '';
+    await Plotly.react(gd, figure.data, figure.layout,
+      { displaylogo:false, scrollZoom:true, responsive:false, modeBarButtonsToRemove:['select2d','lasso2d'] });
+    gd.removeAllListeners && gd.removeAllListeners('plotly_click');
+    gd.on('plotly_click', ev => {
+      const m = ev.points[0] && ev.points[0].data.meta;
+      if (m && m.collection) select(m.collection);
+    });
+    if (schema) { drawRoles(); drawColls(); select(selected); }
+  }
+
+  // The figure carries no title or run/event line; they are rendered here from
+  // layout.meta, so they stay live text rather than pixels baked into the plot.
+  function drawInfo(m) {
+    const bits = [];
+    const kv = (k, v) => `<span><span class="k">${k}</span> <span class="v">${v}</span></span>`;
+    if (m.run != null) bits.push(kv('run', m.run) + ' ' + kv('event', m.event));
+    if (m.source) bits.push(kv('from', m.source + ' entry ' + m.entry));
+    if (m.n_charged != null) bits.push(kv('charged / neutral', m.n_charged + ' / ' + m.n_neutral));
+    if (m.btag != null) bits.push(kv('b-tag X<sub>ev</sub>', (+m.btag).toFixed(2)));
+    if (m.b_field != null) bits.push(kv('B', (+m.b_field).toFixed(3) + ' T'));
+    // --title / --note are a caption for one particular event, never a heading for the tool
+    const caption = [m.title, m.note].filter(Boolean).join(' — ');
+    if (caption) bits.push(`<span class="note">${caption}</span>`);
+    $('info').innerHTML = bits.join('');
+  }
+
+  function setViewButtons() {
+    $('v2d').classList.toggle('on', view === '2d');
+    $('v3d').classList.toggle('on', view === '3d');
+  }
+
+  async function setView(v) {
+    if (v === view || !figs[v]) return;
+    view = v; setViewButtons();
+    figure = figs[view];
+    await Plotly.newPlot(gd, figure.data, figure.layout,
+      { displaylogo:false, scrollZoom:true, responsive:false, modeBarButtonsToRemove:['select2d','lasso2d'] });
+    gd.on('plotly_click', ev => {
+      const m = ev.points[0] && ev.points[0].data.meta;
+      if (m && m.collection) select(m.collection);
+    });
+    if (selected) dim(selected);
+  }
+
+  function setMode() {
+    const live = mode === 'live';
+    ['entry','prev','next','render'].forEach(id => {
+      $(id).disabled = !live;
+      $(id).title = live ? '' : 'load an .edm4hep.root file to step through entries';
+    });
+    document.querySelectorAll('#roles select').forEach(sel => {
+      sel.disabled = !live;
+      sel.title = live ? '' : 'load the .root file to draw a different collection';
+    });
+  }
+
+  // ------------------------------------------------------------------- live
+  async function boot() {
+    if (py) return py;
+    if (booting) return booting;
+    booting = (async () => {
+      setStatus('booting Python (first time only)…'); bar(10);
+      const p = await loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.28.0/full/' });
+      bar(35); setStatus('loading numpy and awkward…');
+      await p.loadPackage(['numpy', 'awkward-cpp', 'micropip']);
+      bar(55); setStatus('installing uproot, awkward, plotly…');
+      const mp = p.pyimport('micropip');
+      await mp.install(['uproot', 'awkward', 'plotly']);
+      bar(78); setStatus('installing delphi_eventdisplay…');
+      let wheel = 'wheels/delphi_eventdisplay-0.1.0-py3-none-any.whl';
+      try { const m = await fetch('wheels/index.json').then(r => r.json()); if (m.wheel) wheel = 'wheels/' + m.wheel; } catch (e) {}
+      await mp.install(new URL(wheel, location.href).href);
+      p.globals.set('DOMAINS_JSON', JSON.stringify(domains));
+      p.FS.mkdir('/work');
+      py = p; bar(95);
+      return p;
+    })().catch(err => {
+      booting = null;
+      setStatus('could not start Python in this browser: ' + err.message +
+                ' — the showcase event above still works', 'err');
+      bar(0); throw err;
+    });
+    return booting;
+  }
+
+  async function loadFile(f) {
+    try {
+      await boot();
+      setStatus(`reading ${f.name} (${(f.size/1e6).toFixed(0)} MB)…`);
+      py.FS.writeFile('/work/' + f.name, new Uint8Array(await f.arrayBuffer()));
+      loadedName = f.name;
+      const n = await py.runPythonAsync(`
+from delphi_eventdisplay.read import n_entries
+n_entries("/work/${f.name}")
+`);
+      $('entry').max = n - 1;
+      if (+$('entry').value > n - 1) $('entry').value = 0;
+      mode = 'live'; setMode();
+      setStatus(`${f.name}: ${n.toLocaleString()} events — choose an entry and render`, 'ok');
+      bar(0);
+    } catch (err) { setStatus('failed to read the file: ' + err.message, 'err'); bar(0); }
+  }
+
+  function overridesJSON() {
+    const o = {};
+    document.querySelectorAll('#roles select').forEach(s => { if (s.value) o[s.dataset.role] = s.value; });
+    return JSON.stringify(o);
+  }
+
+  async function render() {
+    if (mode !== 'live' || !loadedName) return;
+    const entry = +$('entry').value;
+    try {
+      $('render').disabled = true;
+      setStatus(`building entry ${entry}…`); bar(30);
+      const out = await py.runPythonAsync(`
+import json
+from delphi_eventdisplay import read_event, build, build3d
+from delphi_eventdisplay.schema import to_dict
+
+_ov = json.loads(r\'\'\'${overridesJSON()}\'\'\')
+_e = read_event("/work/${loadedName}", ${entry}, collections=_ov or None,
+                domains=json.loads(DOMAINS_JSON))
+# show the tracks the RICH actually saw, highest momentum first
+_rich = sorted([i for i, h in _e.haid.items() if len(h) >= 18 and (h[15] > 0 or h[10] > 0)],
+               key=lambda i: -float(_e.p_abs[i]))[:6]
+_fig = build(_e, rich=_rich)
+_f3 = build3d(_e)
+json.dumps({"figure": json.loads(_fig.to_json()),
+            "figure3d": json.loads(_f3.to_json()),
+            "schema": to_dict(_e.schema, _e.roles)})
+`);
+      bar(80);
+      const res = JSON.parse(out);
+      await show({ '2d': res.figure, '3d': res.figure3d }, res.schema);
+      setMode();
+      bar(100); setTimeout(() => bar(0), 500);
+      setStatus(`entry ${entry}: ${Object.values(schema.collections).filter(c=>c.count).length} collections populated`, 'ok');
+    } catch (err) {
+      setStatus('render failed: ' + err.message, 'err'); bar(0);
+    } finally { $('render').disabled = (mode !== 'live'); }
+  }
+
+  // --------------------------------------------------------- collection panel
+  const KIND_OF_ROLE = { particles:'ReconstructedParticle', jets:'ReconstructedParticle', tracks:'Track',
+    primary_vertex:'Vertex', secondary_vertices:'Vertex', em_clusters:'Cluster',
+    vd_hits:'TrackerHit3D', hadron_id:'ParticleID' };
+
+  function drawRoles() {
+    const box = $('roles'); box.innerHTML = '';
+    for (const [role, kind] of Object.entries(KIND_OF_ROLE)) {
+      const row = document.createElement('div'); row.className = 'role';
+      const lab = document.createElement('label'); lab.textContent = role.replace(/_/g,' ');
+      const sel = document.createElement('select'); sel.dataset.role = role;
+      const options = Object.entries(schema.collections).filter(([,c]) => c.kind === kind)
+        .sort((a,b) => (b[1].count - a[1].count) || a[0].localeCompare(b[0]));
+      for (const [name, c] of options) {
+        const o = document.createElement('option'); o.value = name;
+        o.textContent = `${name} (${c.count})`; sel.appendChild(o);
+      }
+      if (schema.roles[role]) sel.value = schema.roles[role];
+      sel.addEventListener('change', render);
+      row.append(lab, sel); box.appendChild(row);
+    }
+    setMode();
+  }
+
+  function drawColls() {
+    const box = $('colls'); box.innerHTML = '';
+    const q = $('find').value.trim().toLowerCase();
+    const onlyFilled = $('onlyfilled').checked;
+    const used = new Set(Object.values(schema.roles));
+    const byKind = {};
+    for (const [name, c] of Object.entries(schema.collections)) {
+      if (onlyFilled && !c.count && !used.has(name)) continue;
+      if (q && ![name, c.type, c.domain, c.provenance].join(' ').toLowerCase().includes(q)) continue;
+      (byKind[c.kind] ||= []).push([name, c]);
+    }
+    for (const kind of Object.keys(byKind).sort()) {
+      const h = document.createElement('div'); h.className = 'kind'; h.textContent = kind; box.appendChild(h);
+      for (const [name, c] of byKind[kind].sort((a,b)=> (b[1].count-a[1].count) || a[0].localeCompare(b[0]))) {
+        const d = document.createElement('div');
+        d.className = 'coll' + (c.count ? '' : ' empty') + (name === selected ? ' sel' : '');
+        d.dataset.name = name;
+        d.innerHTML = '<span class="n"></span><span class="nm"></span><span class="meta"></span>';
+        d.querySelector('.n').textContent = c.count;
+        d.querySelector('.nm').textContent = name;
+        const badges = [];
+        if (used.has(name)) badges.push('<span class="badge used">drawn</span>');
+        if (c.domain && c.domain !== 'unknown') badges.push('<span class="badge">'+c.domain+'</span>');
+        badges.push('<span class="badge">'+c.provenance+'</span>');
+        d.querySelector('.meta').innerHTML = badges.join('');
+        d.addEventListener('click', () => select(name));
+        box.appendChild(d);
+      }
+    }
+  }
+
+  function select(name) {
+    selected = name;
+    document.querySelectorAll('.coll').forEach(d => d.classList.toggle('sel', d.dataset.name === name));
+    const det = $('detail');
+    if (!name || !schema || !schema.collections[name]) { det.innerHTML = ''; dim(null); return; }
+    const c = schema.collections[name];
+    const linksOut = c.links.map(l => l.relation + ' \u2192 ' + l.to);
+    const linksIn = Object.entries(schema.collections).flatMap(([n, cc]) =>
+      cc.links.filter(l => l.to === name).map(l => n + ' \u2192 ' + l.relation));
+    const role = Object.entries(schema.roles).find(([, v]) => v === name);
+    det.innerHTML = '<dl>'
+      + '<dt>collection</dt><dd>' + name + '</dd>'
+      + '<dt>type</dt><dd>' + c.type + '</dd>'
+      + '<dt>in this event</dt><dd>' + c.count + ' object' + (c.count === 1 ? '' : 's') + '</dd>'
+      + '<dt>domain / provenance</dt><dd>' + c.domain + ' \u00b7 ' + c.provenance + '</dd>'
+      + (role ? '<dt>drawn as</dt><dd>' + role[0].replace(/_/g,' ') + '</dd>' : '')
+      + '<dt>links out</dt><dd>' + (linksOut.length ? linksOut.join('<br>') : '\u2014') + '</dd>'
+      + '<dt>links in</dt><dd>' + (linksIn.length ? linksIn.join('<br>') : '\u2014') + '</dd>'
+      + '</dl>';
+    dim(name);
+  }
+
+  function dim(name) {
+    if (!figure) return;
+    const op = figure.data.map(t => {
+      if (!name) return (t.opacity === undefined ? 1 : t.opacity);
+      return (t.meta && t.meta.collection === name) ? 1 : 0.12;
+    });
+    Plotly.restyle(gd, { opacity: op });
+  }
+
+  // ------------------------------------------------------------------ wiring
+  $('pick').addEventListener('click', e => { e.preventDefault(); $('file').click(); });
+  $('file').addEventListener('change', e => { const f = e.target.files[0]; if (f) loadFile(f); });
+  const dz = $('drop');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+  document.body.addEventListener('dragover', e => e.preventDefault());
+  document.body.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('over');
+    const f = e.dataTransfer.files[0]; if (f) loadFile(f);
+  });
+  $('render').addEventListener('click', render);
+  $('prev').addEventListener('click', () => { $('entry').value = Math.max(0, +$('entry').value - 1); render(); });
+  $('next').addEventListener('click', () => { $('entry').value = +$('entry').value + 1; render(); });
+  $('find').addEventListener('input', () => schema && drawColls());
+  $('onlyfilled').addEventListener('change', () => schema && drawColls());
+  $('showcase').addEventListener('change', e => loadShowcase(e.target.value));
+  function saveName() {
+    const m = (figure && figure.layout && figure.layout.meta) || {};
+    const base = m.run != null ? `delphi_run${m.run}_evt${m.event}` : 'delphi_event';
+    return base + (view === '3d' ? '_3d' : '');
+  }
+  $('savePng').addEventListener('click', () =>
+    Plotly.downloadImage(gd, { format:'png', scale:2, filename:saveName(),
+                               width:(figure.layout.width||1500), height:(figure.layout.height||1450) }));
+  $('saveSvg').addEventListener('click', () =>
+    Plotly.downloadImage(gd, { format:'svg', filename:saveName(),
+                               width:(figure.layout.width||1500), height:(figure.layout.height||1450) }));
+  $('saveJson').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify({ data: gd.data, layout: gd.layout }, null, 1)],
+                          { type:'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = saveName() + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  });
+
+  $('v2d').addEventListener('click', () => setView('2d'));
+  $('v3d').addEventListener('click', () => setView('3d'));
+
+  // open on the showcase event: published JSON, no Python needed
+  (async function init() {
+    await loadDomains();
+    try { manifest = await fetch('events/index.json').then(r => r.json()); } catch (e) {}
+    for (const ev of manifest.events) {
+      const o = document.createElement('option'); o.value = ev.key; o.textContent = ev.title;
+      $('showcase').appendChild(o);
+    }
+    if (!manifest.events.length) { $('showcase').style.display = 'none'; setStatus('drop a file to begin'); setMode(); return; }
+    await loadShowcase(new URLSearchParams(location.search).get('ev'));
+  })();
+})();
+</script>
+</body></html>

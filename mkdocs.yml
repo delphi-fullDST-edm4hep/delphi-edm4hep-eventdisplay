@@ -1,0 +1,67 @@
+# The published site root (docs/) is the application itself; the manual is built
+# into docs/manual/ so both ship from one Pages artefact.
+site_name: DELPHI event display
+site_description: DELPHI events from edm4hep, drawn with Plotly — interactive, in the browser
+site_url: https://delphi-fulldst-edm4hep.github.io/delphi-edm4hep-eventdisplay/manual/
+repo_url: https://github.com/delphi-fullDST-edm4hep/delphi-edm4hep-eventdisplay
+edit_uri: edit/main/doc/
+
+docs_dir: doc
+site_dir: docs/manual
+
+theme:
+  name: material
+  logo: ../logo.png
+  favicon: ../logo.png
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      toggle: { icon: material/weather-night, name: Dark mode }
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      toggle: { icon: material/weather-sunny, name: Light mode }
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - toc.follow
+
+nav:
+  - Overview: index.md
+  - Using it:
+      - The browser app: app.md
+      - Command line: cli.md
+      - Collections and roles: collections.md
+  - What is drawn:
+      - Panels and the 3-D scene: views.md
+      - Decoding rules and self-checks: physics.md
+  - Reference:
+      - Python API: api.md
+      - Publishing: deploy.md
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - tables
+  - toc: { permalink: true }
+  - pymdownx.highlight: { anchor_linenums: true }
+  - pymdownx.superfences
+  - pymdownx.details
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            show_source: true
+            show_root_heading: true
+            heading_level: 3
+            docstring_style: google
+            members_order: source
+            separate_signature: true
+            show_signature_annotations: true
