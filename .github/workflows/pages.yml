@@ -37,15 +37,40 @@ jobs:
           pip install -e '.[docs]'
           mkdocs build   # not --strict: the manual deliberately links out to ../app.html
 
-      # enablement: turns Pages on the first time this runs, so no one has to click
-      # through Settings. It needs Pages to be available for the repository at all:
-      # a private repo on a free plan cannot have Pages, so either make the repo
-      # public (as delphi-edm4hep is) or move the org to a paid plan.
-      - uses: actions/configure-pages@v5
-        with:
-          enablement: true
-      - uses: actions/upload-pages-artifact@v3
+      # Pages is not available for a private repository on a free plan, and this org is
+      # on the free plan. Rather than fail every push, check first and skip the publish
+      # with a warning; make the repository public (as delphi-edm4hep is) or move the org
+      # to a paid plan, and the steps below start running on their own.
+      - id: avail
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/$GITHUB_REPOSITORY/pages" >/dev/null 2>&1; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "Pages is enabled; publishing."
+          elif gh api -X POST "repos/$GITHUB_REPOSITORY/pages" -f build_type=workflow >/dev/null 2>&1; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "Pages enabled for this repository; publishing."
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Pages not published::GitHub Pages is unavailable for this repository (a private repo on a free plan cannot use Pages). Make the repository public or move the organisation to a paid plan. The site was built but not deployed."
+          fi
+
+      - if: steps.avail.outputs.ready == 'true'
+        uses: actions/configure-pages@v5
+      - if: steps.avail.outputs.ready == 'true'
+        uses: actions/upload-pages-artifact@v3
         with:
           path: docs
-      - id: deploy
+      - if: steps.avail.outputs.ready == 'true'
+        id: deploy
         uses: actions/deploy-pages@v4
+
+      - if: steps.avail.outputs.ready != 'true'
+        name: Site built but not published
+        run: |
+          echo "### Pages not published" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "The site built fine (\`docs/\`, manual included) but GitHub Pages is not available for this repository." >> "$GITHUB_STEP_SUMMARY"
+          echo "A **private** repository on a **free** plan cannot use Pages." >> "$GITHUB_STEP_SUMMARY"
+          echo "Make the repository public, or move the organisation to a paid plan." >> "$GITHUB_STEP_SUMMARY"
